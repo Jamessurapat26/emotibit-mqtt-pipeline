@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  emotibit-sensors-api:
+    build:
+      context: ./emotibit-sensors-api
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./emotibit-sensors-api/.env
+    volumes:
+      - ./emotibit-sensors-api:/app
+      - /app/node_modules
+    networks:
+      - emotibit-network
+    depends_on:
+      - mongodb
+    restart: unless-stopped
+
+  model-classification-api:
+    build:
+      context: ./model-classification-api
+      dockerfile: dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./model-classification-api:/app
+    networks:
+      - emotibit-network
+    restart: unless-stopped
+
+  mqtt-subscriber:
+    build:
+      context: ./mqttSubcriber
+      dockerfile: Dockerfile
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/
+      - MONGO_DB_NAME=emotibit_data
+      - MONGO_COLLECTION=sensor_readings
+      # Using EMQX public broker as seen in mqtt_handle.py
+      - MQTT_BROKER_HOST=broker.emqx.io
+      - MQTT_BROKER_PORT=1883
+    networks:
+      - emotibit-network
+    depends_on:
+      - mongodb
+    restart: unless-stopped
+
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    networks:
+      - emotibit-network
+    restart: unless-stopped
+
+networks:
+  emotibit-network:
+    driver: bridge
+
+volumes:
+  mongodb-data:
